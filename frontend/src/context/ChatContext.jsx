@@ -15,10 +15,20 @@ export const ChatProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   const abortControllerRef = useRef(null);
+  const charQueueRef = useRef([]);
+  const typingTimerRef = useRef(null);
+  const streamFinishedRef = useRef(false);
+  const pendingAssistantMsgRef = useRef(null);
+  const displayedContentRef = useRef('');
 
   // Load conversations on mount
   useEffect(() => {
     loadConversations();
+    return () => {
+      if (typingTimerRef.current) {
+        clearInterval(typingTimerRef.current);
+      }
+    };
   }, []);
 
   // When active conversation changes, fetch its messages
@@ -35,7 +45,7 @@ export const ChatProvider = ({ children }) => {
       const list = await api.getConversations();
       setConversations(list);
     } catch (err) {
-      console.warn('Could not load conversations (DB might be offline):', err.message);
+      console.warn('Could not load conversations:', err.message);
     }
   };
 
@@ -54,6 +64,13 @@ export const ChatProvider = ({ children }) => {
       setError('Failed to load conversation history');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const clearTypingTimer = () => {
+    if (typingTimerRef.current) {
+      clearInterval(typingTimerRef.current);
+      typingTimerRef.current = null;
     }
   };
 
@@ -106,7 +123,48 @@ export const ChatProvider = ({ children }) => {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    clearTypingTimer();
+    charQueueRef.current = [];
+
+    const finalContent = displayedContentRef.current;
+    if (finalContent) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          _id: `msg-${Date.now()}`,
+          role: 'assistant',
+          content: finalContent,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    }
+
     setIsStreaming(false);
+    setStreamingContent('');
+    displayedContentRef.current = '';
+  };
+
+  /**
+   * Start character-by-character typewriter loop
+   */
+  const startTypewriterLoop = (onComplete) => {
+    clearTypingTimer();
+
+    typingTimerRef.current = setInterval(() => {
+      if (charQueueRef.current.length > 0) {
+        // Adaptive speed: type 1 char per tick normally, scale up if queue is large
+        const queueLen = charQueueRef.current.length;
+        const charsPerTick = queueLen > 80 ? 4 : queueLen > 30 ? 2 : 1;
+
+        const nextBatch = charQueueRef.current.splice(0, charsPerTick).join('');
+        displayedContentRef.current += nextBatch;
+        setStreamingContent(displayedContentRef.current);
+      } else if (streamFinishedRef.current) {
+        // Finished receiving and finished typing out all characters
+        clearTypingTimer();
+        onComplete(displayedContentRef.current);
+      }
+    }, 18); // ~18ms per character gives smooth, realistic real-time typing
   };
 
   const sendMessage = async (content) => {
@@ -115,6 +173,12 @@ export const ChatProvider = ({ children }) => {
     setError(null);
     setIsStreaming(true);
     setStreamingContent('');
+
+    // Reset typewriter references
+    displayedContentRef.current = '';
+    charQueueRef.current = [];
+    streamFinishedRef.current = false;
+    pendingAssistantMsgRef.current = null;
 
     // Create optimistic user message
     const tempUserMessage = {
@@ -127,7 +191,25 @@ export const ChatProvider = ({ children }) => {
     setMessages((prev) => [...prev, tempUserMessage]);
 
     abortControllerRef.current = new AbortController();
-    let accumulatedContent = '';
+
+    // Start typewriter effect
+    startTypewriterLoop((finalContent) => {
+      setIsStreaming(false);
+      setStreamingContent('');
+      displayedContentRef.current = '';
+
+      setMessages((prev) => [
+        ...prev,
+        pendingAssistantMsgRef.current || {
+          _id: `msg-${Date.now()}`,
+          role: 'assistant',
+          content: finalContent,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      loadConversations();
+    });
 
     await api.streamChat({
       conversationId: activeConversationId,
@@ -135,10 +217,8 @@ export const ChatProvider = ({ children }) => {
       model: selectedModel,
       signal: abortControllerRef.current.signal,
       onMeta: (event) => {
-        // Update active conversation ID if newly created
         if (!activeConversationId && event.conversation?.id) {
           setActiveConversationId(event.conversation.id);
-          // Add to conversation list
           setConversations((prev) => [
             {
               _id: event.conversation.id,
@@ -151,25 +231,17 @@ export const ChatProvider = ({ children }) => {
         }
       },
       onToken: (token) => {
-        accumulatedContent += token;
-        setStreamingContent(accumulatedContent);
+        // Enqueue characters for character-by-character animation
+        const chars = token.split('');
+        charQueueRef.current.push(...chars);
       },
       onDone: (assistantMsg) => {
-        setIsStreaming(false);
-        setStreamingContent('');
-        setMessages((prev) => [
-          ...prev,
-          assistantMsg || {
-            _id: `msg-${Date.now()}`,
-            role: 'assistant',
-            content: accumulatedContent,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-        // Refresh conversations to reflect latest order
-        loadConversations();
+        pendingAssistantMsgRef.current = assistantMsg;
+        streamFinishedRef.current = true;
       },
       onError: (err) => {
+        clearTypingTimer();
+        charQueueRef.current = [];
         setIsStreaming(false);
         setStreamingContent('');
         setError(err.message || 'Error occurred while generating response');
