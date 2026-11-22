@@ -1,7 +1,7 @@
 import { Conversation } from '../models/Conversation.js';
 import { Message } from '../models/Message.js';
-import { OpenAIService } from './openai.service.js';
-import { DEFAULT_MODEL } from '../config/openai.js';
+import { GeminiService } from './gemini.service.js';
+import { DEFAULT_MODEL } from '../config/gemini.js';
 import { ApiError } from '../utils/apiError.js';
 
 export class ChatService {
@@ -22,7 +22,7 @@ export class ChatService {
       }
     } else {
       // Auto-generate title for new conversation
-      const generatedTitle = await OpenAIService.generateTitle(message);
+      const generatedTitle = await GeminiService.generateTitle(message);
       conversation = await Conversation.create({
         title: generatedTitle,
         model: selectedModel,

@@ -1,7 +1,7 @@
-import { genAI, DEFAULT_MODEL } from '../config/openai.js';
+import { genAI, DEFAULT_MODEL } from '../config/gemini.js';
 import { ApiError } from '../utils/apiError.js';
 
-export class OpenAIService {
+export class GeminiService {
   /**
    * Helper to format generic chat messages for Gemini
    */

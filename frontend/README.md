@@ -1,6 +1,6 @@
-# Frontend - AI Chat Assistant Web App
+# Frontend - Gemini AI Chat Assistant Web App
 
-React + Vite + Tailwind CSS Single Page Application for AI Chat Assistant.
+React + Vite + Tailwind CSS Single Page Application for Gemini AI Chat Assistant.
 
 ## Features
 - **Vite 6 + React 18**: Ultra fast HMR development.
@@ -8,7 +8,7 @@ React + Vite + Tailwind CSS Single Page Application for AI Chat Assistant.
 - **Real-time SSE Streaming**: Consumes stream chunks token by token.
 - **Markdown & Code Highlighting**: Supports GitHub Flavored Markdown with copy code button.
 - **Conversations History**: Manage previous chats, switch active conversations, or delete.
-- **Model Selector**: Switch between GPT-4o, GPT-4o-mini, and GPT-3.5-turbo.
+- **Model Selector**: Switch between Gemini Flash-Lite, Gemini Flash, and Gemini Pro.
 - **Keyboard Shortcuts**: `Enter` to send, `Shift+Enter` for newline.
 
 ## Available Scripts

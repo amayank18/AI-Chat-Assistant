@@ -1,7 +1,7 @@
 import { ChatService } from '../services/chat.service.js';
-import { OpenAIService } from '../services/openai.service.js';
+import { GeminiService } from '../services/gemini.service.js';
 import { ApiResponse } from '../utils/apiResponse.js';
-import { AVAILABLE_MODELS } from '../config/openai.js';
+import { AVAILABLE_MODELS } from '../config/gemini.js';
 
 /**
  * Handle Streaming Chat Completion via Server-Sent Events (SSE)
@@ -51,7 +51,7 @@ export const streamChat = async (req, res, next) => {
     );
 
     // Call Gemini streaming API
-    const stream = await OpenAIService.createChatStream({
+    const stream = await GeminiService.createChatStream({
       messages: formattedMessages,
       model: selectedModel,
     });
@@ -119,7 +119,7 @@ export const sendChatMessage = async (req, res, next) => {
       systemPrompt,
     });
 
-    const completion = await OpenAIService.createChatCompletion({
+    const completion = await GeminiService.createChatCompletion({
       messages: formattedMessages,
       model: selectedModel,
     });
